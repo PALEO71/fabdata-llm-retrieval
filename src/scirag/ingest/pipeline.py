@@ -25,6 +25,21 @@ def _extract_text(path: Path) -> Optional[str]:
             return "\n".join(p.extract_text() or "" for p in PdfReader(str(path)).pages)
     elif suffix in (".txt", ".md"):
         return path.read_text(encoding="utf-8", errors="replace")
+    elif suffix == ".pptx":
+        from pptx import Presentation
+        prs = Presentation(str(path))
+        slides = []
+        for i, slide in enumerate(prs.slides, 1):
+            parts = [f"[Slide {i}]"]
+            for shape in slide.shapes:
+                if hasattr(shape, "text") and shape.text.strip():
+                    parts.append(shape.text.strip())
+            slides.append("\n".join(parts))
+        return "\n\n".join(slides)
+    elif suffix == ".docx":
+        from docx import Document
+        doc = Document(str(path))
+        return "\n".join(p.text for p in doc.paragraphs if p.text.strip())
     return None
 
 
@@ -37,7 +52,7 @@ def ingest_folder(
     folder: str | Path,
     tier: int,
     db_path: Optional[Path] = None,
-    exts: tuple = (".pdf", ".txt", ".md"),
+    exts: tuple = (".pdf", ".txt", ".md", ".pptx", ".docx"),
     skip_existing: bool = True,
 ) -> int:
     folder = Path(folder)
