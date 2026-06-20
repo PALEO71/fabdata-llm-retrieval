@@ -12,6 +12,14 @@ TIER_CHUNK_SIZES = {1: 200, 2: 500, 3: 300, 4: 800}
 TIER_MODES = {1: "divulgacao", 2: "investigacao", 3: "pedagogico", 4: "investigacao"}
 BATCH = 64
 
+# ── Standalone chunker (no fdllmret / no OpenAI dependency) ──────────────────
+import tiktoken as _tiktoken
+
+_tokenizer = _tiktoken.get_encoding("cl100k_base")
+_MIN_CHARS = 350
+_MIN_LEN = 5
+_MAX_CHUNKS = 10000
+
 
 def _extract_text(path: Path) -> Optional[str]:
     suffix = path.suffix.lower()
@@ -44,8 +52,30 @@ def _extract_text(path: Path) -> Optional[str]:
 
 
 def _chunk_text(text: str, chunk_size: int) -> List[str]:
-    from fdllmret.services.chunks import get_text_chunks
-    return get_text_chunks(text, chunk_size)
+    if not text or text.isspace():
+        return []
+    tokens = _tokenizer.encode(text, disallowed_special=())
+    chunks, n = [], 0
+    while tokens and n < _MAX_CHUNKS:
+        chunk = tokens[:chunk_size]
+        chunk_text = _tokenizer.decode(chunk)
+        if not chunk_text or chunk_text.isspace():
+            tokens = tokens[len(chunk):]
+            continue
+        cut = max(chunk_text.rfind("."), chunk_text.rfind("?"),
+                  chunk_text.rfind("!"), chunk_text.rfind("\n"))
+        if cut != -1 and cut > _MIN_CHARS:
+            chunk_text = chunk_text[:cut + 1]
+        ct = chunk_text.replace("\n", " ").strip()
+        if len(ct) > _MIN_LEN:
+            chunks.append(ct)
+        tokens = tokens[len(_tokenizer.encode(chunk_text, disallowed_special=())):]
+        n += 1
+    if tokens:
+        tail = _tokenizer.decode(tokens).replace("\n", " ").strip()
+        if len(tail) > _MIN_LEN:
+            chunks.append(tail)
+    return chunks
 
 
 def ingest_folder(
