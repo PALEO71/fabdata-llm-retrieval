@@ -1,19 +1,31 @@
 from __future__ import annotations
+import os
 from typing import List
 import numpy as np
 
+# Portuguese-friendly multilingual model. Override via env var if needed.
+_MODEL_NAME = os.getenv("SCIRAG_EMBED_MODEL", "paraphrase-multilingual-mpnet-base-v2")
+_model = None
 
-def _get_embeddings_fn():
-    """Lazy import — avoids failing at module load if OPENAI_API_KEY is absent."""
-    from fdllmret.services.openai import get_embeddings
-    return get_embeddings
+
+def _get_model():
+    """Lazy load — model downloads once (~420 MB) then is cached locally."""
+    global _model
+    if _model is None:
+        from sentence_transformers import SentenceTransformer
+        _model = SentenceTransformer(_MODEL_NAME)
+    return _model
 
 
 def embed_texts(texts: List[str]) -> List[np.ndarray]:
-    """Return one float32 numpy array per text."""
-    get_embeddings = _get_embeddings_fn()
-    raw = get_embeddings(texts)
-    return [np.array(v, dtype=np.float32) for v in raw]
+    """Return one L2-normalised float32 numpy array per text."""
+    vecs = _get_model().encode(
+        texts,
+        convert_to_numpy=True,
+        normalize_embeddings=True,  # L2 norm → dot product = cosine similarity
+        show_progress_bar=False,
+    )
+    return [v.astype(np.float32) for v in vecs]
 
 
 def to_blob(vec: np.ndarray) -> bytes:
@@ -25,10 +37,8 @@ def from_blob(blob: bytes) -> np.ndarray:
 
 
 def cosine(a: np.ndarray, b: np.ndarray) -> float:
-    na, nb = float(np.linalg.norm(a)), float(np.linalg.norm(b))
-    if na == 0.0 or nb == 0.0:
-        return 0.0
-    return float(np.dot(a, b) / (na * nb))
+    # Embeddings are L2-normalised, so dot product equals cosine similarity.
+    return float(np.dot(a, b))
 
 
 def top_k_semantic(
