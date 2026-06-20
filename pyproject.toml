@@ -25,6 +25,7 @@ dependencies = [
     "matplotlib==3.*",
     "numpy==2.*",
     "thefuzz[speedup]>=0.22",
+    "fastmcp>=2.0",
 ]
 
 [tool.uv.sources]
