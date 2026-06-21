@@ -49,22 +49,24 @@ def _get_anthro():
 
 
 def _fts_search(conn, query: str, top_k: int, writing_mode, tier) -> list[dict]:
-    safe = query.replace('"', "").replace("'", "").strip()
+    import re
+    safe = re.sub(r'["\'\-\+\*\(\)\:]', ' ', query).strip()
     if not safe:
         return []
-    where_clauses = ["nodes_fts MATCH ?"]
-    params: list = [f'"{safe}"']
+    tokens = safe.split()
+    fts_query = " ".join(f'"{t}"' for t in tokens if t)
+    where_clauses = ["id IN (SELECT node_id FROM nodes_fts WHERE nodes_fts MATCH ?)"]
+    params: list = [fts_query]
     if writing_mode:
-        where_clauses.append("n.writing_mode = ?")
+        where_clauses.append("writing_mode = ?")
         params.append(writing_mode)
     if tier is not None:
-        where_clauses.append("n.tier = ?")
+        where_clauses.append("tier = ?")
         params.append(tier)
     where = " AND ".join(where_clauses)
     rows = conn.execute(
-        f"SELECT n.id, n.content, n.title, n.writing_mode, n.tier, n.source_id "
-        f"FROM nodes_fts f JOIN nodes n ON n.id = f.node_id "
-        f"WHERE {where} ORDER BY rank LIMIT ?",
+        f"SELECT id, content, title, writing_mode, tier, source_id "
+        f"FROM nodes WHERE {where} LIMIT ?",
         params + [top_k],
     ).fetchall()
     return [dict(r) for r in rows]

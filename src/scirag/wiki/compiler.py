@@ -21,18 +21,33 @@ def _get_client():
     return _client
 
 
+def _ensure_fts(conn) -> None:
+    """Rebuild FTS5 index if it is empty but nodes exist (handles INSERT OR REPLACE timing)."""
+    fts_count = conn.execute("SELECT COUNT(*) FROM nodes_fts").fetchone()[0]
+    if fts_count == 0:
+        node_count = conn.execute("SELECT COUNT(*) FROM nodes").fetchone()[0]
+        if node_count > 0:
+            print(f"  [FTS5] index empty — rebuilding from {node_count} nodes...")
+            conn.execute(
+                "INSERT INTO nodes_fts(node_id, content, title) "
+                "SELECT id, content, COALESCE(title, '') FROM nodes"
+            )
+            conn.commit()
+
+
 def _fetch_nodes_for_theme(conn, seed: dict) -> list[dict]:
     import re
+    _ensure_fts(conn)
     keywords = seed["keywords"][0] if seed["keywords"] else seed["title"]
-    # Strip FTS5 special chars (-, +, *, :, quotes, parens) then quote each token
+    # Strip FTS5 special chars then quote each token
     tokens = re.sub(r'["\'\-\+\*\(\)\:]', ' ', keywords).split()
     fts_query = " ".join(f'"{t}"' for t in tokens if t)
     if not fts_query:
         fts_query = f'"{seed["title"]}"'
     rows = conn.execute(
-        "SELECT n.id, n.content, n.title, n.writing_mode "
-        "FROM nodes_fts f JOIN nodes n ON n.id = f.node_id "
-        "WHERE nodes_fts MATCH ? ORDER BY rank LIMIT 25",
+        "SELECT id, content, title, writing_mode FROM nodes "
+        "WHERE id IN (SELECT node_id FROM nodes_fts WHERE nodes_fts MATCH ?) "
+        "LIMIT 25",
         (fts_query,),
     ).fetchall()
     nodes = [dict(r) for r in rows]
