@@ -92,6 +92,8 @@ def ingest_folder(
 
     with get_conn(db_path) as conn:
         for fpath in sorted(folder.rglob("*")):
+            if fpath.name.startswith("~$"):  # skip Word temp lock files
+                continue
             if fpath.suffix.lower() not in exts:
                 continue
 
