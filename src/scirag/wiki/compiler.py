@@ -8,7 +8,7 @@ from typing import Optional
 from ..db import get_conn
 from .seeds import SEED_THEMES
 
-MODEL = os.getenv("SCIRAG_WIKI_MODEL", "claude-3-5-sonnet-20241022")
+MODEL = os.getenv("SCIRAG_WIKI_MODEL", "claude-sonnet-4-6")
 
 _client = None
 

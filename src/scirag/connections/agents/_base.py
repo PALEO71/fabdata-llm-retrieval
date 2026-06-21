@@ -3,7 +3,7 @@ import json
 import os
 from typing import Optional
 
-MODEL = os.getenv("SCIRAG_AGENT_MODEL", "claude-3-5-haiku-20241022")
+MODEL = os.getenv("SCIRAG_AGENT_MODEL", "claude-haiku-4-5-20251001")
 
 _client = None
 

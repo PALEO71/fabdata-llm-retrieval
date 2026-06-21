@@ -13,7 +13,7 @@ from ..embed import embed_texts, from_blob, to_blob, top_k_semantic
 
 mcp = FastMCP("scirag — RAG pessoal para comunicador de ciência português")
 
-SYNTH_MODEL = os.getenv("SCIRAG_SYNTH_MODEL", "claude-3-5-sonnet-20241022")
+SYNTH_MODEL = os.getenv("SCIRAG_SYNTH_MODEL", "claude-sonnet-4-6")
 
 _MODE_PROMPTS = {
     "divulgacao": (
