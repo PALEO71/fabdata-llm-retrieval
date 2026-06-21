@@ -46,9 +46,9 @@ def run_agent(
             if result.get("connect"):
                 result["type"] = connection_type
             return result
-    except Exception:
-        pass
-    return None
+    except Exception as exc:
+        print(f"    [agent error] {exc}")
+        return None
 
 
 def _make_agent(prompts: dict, types: dict, name: str):
