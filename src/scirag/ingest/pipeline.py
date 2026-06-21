@@ -104,7 +104,15 @@ def ingest_folder(
             ).fetchone():
                 continue
 
-            text = _extract_text(fpath)
+            if fpath.stat().st_size == 0:
+                print(f"  skipping empty file: {fpath.name}")
+                continue
+
+            try:
+                text = _extract_text(fpath)
+            except Exception as exc:
+                print(f"  skipping unreadable file: {fpath.name} ({exc})")
+                continue
             if not text or text.isspace():
                 continue
 
