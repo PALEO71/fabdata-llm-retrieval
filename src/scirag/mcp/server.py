@@ -54,7 +54,7 @@ def _fts_search(conn, query: str, top_k: int, writing_mode, tier) -> list[dict]:
     if not safe:
         return []
     tokens = safe.split()
-    fts_query = " ".join(f'"{t}"' for t in tokens if t)
+    fts_query = " OR ".join(f'"{t}"' for t in tokens if t)
     where_clauses = ["id IN (SELECT node_id FROM nodes_fts WHERE nodes_fts MATCH ?)"]
     params: list = [fts_query]
     if writing_mode:

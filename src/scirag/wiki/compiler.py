@@ -41,7 +41,8 @@ def _fetch_nodes_for_theme(conn, seed: dict) -> list[dict]:
     keywords = seed["keywords"][0] if seed["keywords"] else seed["title"]
     # Strip FTS5 special chars then quote each token
     tokens = re.sub(r'["\'\-\+\*\(\)\:]', ' ', keywords).split()
-    fts_query = " ".join(f'"{t}"' for t in tokens if t)
+    # OR between terms so any keyword match qualifies (chunks are small)
+    fts_query = " OR ".join(f'"{t}"' for t in tokens if t)
     if not fts_query:
         fts_query = f'"{seed["title"]}"'
     rows = conn.execute(
