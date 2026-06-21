@@ -131,6 +131,13 @@ def compile_all(db_path: Optional[Path] = None) -> dict[str, int]:
     results = {}
     for theme in SEED_THEMES:
         print(f"  compiling wiki: {theme}")
-        r = compile_wiki(theme, db_path)
+        try:
+            r = compile_wiki(theme, db_path)
+        except Exception as exc:
+            print(f"    [exception] {exc}")
+            results[theme] = -1
+            continue
+        if "error" in r:
+            print(f"    [error] {r['error']}")
         results[theme] = r.get("node_count", 0) if "error" not in r else -1
     return results
