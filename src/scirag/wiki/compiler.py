@@ -22,13 +22,18 @@ def _get_client():
 
 
 def _fetch_nodes_for_theme(conn, seed: dict) -> list[dict]:
+    import re
     keywords = seed["keywords"][0] if seed["keywords"] else seed["title"]
-    safe = keywords.replace('"', "").replace("'", "")
+    # Strip FTS5 special chars (-, +, *, :, quotes, parens) then quote each token
+    tokens = re.sub(r'["\'\-\+\*\(\)\:]', ' ', keywords).split()
+    fts_query = " ".join(f'"{t}"' for t in tokens if t)
+    if not fts_query:
+        fts_query = f'"{seed["title"]}"'
     rows = conn.execute(
         "SELECT n.id, n.content, n.title, n.writing_mode "
         "FROM nodes_fts f JOIN nodes n ON n.id = f.node_id "
         "WHERE nodes_fts MATCH ? ORDER BY rank LIMIT 25",
-        (safe,),
+        (fts_query,),
     ).fetchall()
     nodes = [dict(r) for r in rows]
 
