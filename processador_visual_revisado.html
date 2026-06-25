@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Processador Visual p5.js - Edição Cinemática & Math</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.js"></script>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: #121212;
+      color: #ffffff;
+      display: flex;
+      margin: 0;
+      padding: 20px;
+      gap: 20px;
+    }
+    .panel {
+      background-color: #1e1e1e;
+      padding: 20px;
+      border-radius: 12px;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+      width: 320px;
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+      overflow-y: auto;
+      max-height: 90vh;
+    }
+    h2 { margin-top: 0; font-size: 1.2rem; color: #4da6ff; }
+    .control-group { display: flex; flex-direction: column; gap: 5px; }
+    label { font-size: 0.85rem; color: #aaaaaa; }
+    select, input[type="range"] { width: 100%; cursor: pointer; }
+    select { padding: 8px; border-radius: 6px; background: #2a2a2a; color: white; border: 1px solid #444; }
+    .value-badge { font-size: 0.75rem; color: #4da6ff; font-weight: bold; }
+    .btn {
+      padding: 10px;
+      border: none;
+      border-radius: 6px;
+      background-color: #4da6ff;
+      color: #121212;
+      font-weight: bold;
+      cursor: pointer;
+      transition: background 0.2s;
+      margin-top: 5px;
+    }
+    .btn:hover { background-color: #3388dd; }
+    .btn-record { background-color: #ff4d4d; color: white; }
+    .btn-record:hover { background-color: #cc0000; }
+    .btn:disabled { background-color: #555; color: #888; cursor: not-allowed; }
+    canvas { border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.5); }
+    #canvas-container { flex-grow: 1; display: flex; justify-content: center; align-items: flex-start; }
+  </style>
+</head>
+<body>
+
+  <div class="panel">
+    <h2>Controlos Visuais</h2>
+
+    <div class="control-group">
+      <label>Carregar Media</label>
+      <input type="file" id="file-input" accept="image/*,video/*" />
+    </div>
+
+    <div class="control-group">
+      <label>Efeito Visual</label>
+      <select id="mode-select">
+        <optgroup label="Básicos">
+          <option value="ascii">Caracteres ASCII</option>
+          <option value="circles">Círculos Dinâmicos</option>
+          <option value="lines">Linhas Direcionais</option>
+          <option value="particles">Partículas (Stippling)</option>
+        </optgroup>
+        <optgroup label="Matemática & Física">
+          <option value="spiral">Espiral Arquimediana</option>
+          <option value="waves">Ondas Senoidais</option>
+          <option value="mesh">Malha Poligonal</option>
+          <option value="lissajous">Órbitas de Lissajous</option>
+          <option value="smoothstep">Lerp + Smoothstep (Cor)</option>
+          <option value="ripple">Oscilação Amortecida</option>
+          <option value="easing">Círculos (Ease-In Quad)</option>
+        </optgroup>
+      </select>
+    </div>
+
+    <div class="control-group">
+      <label>Resolução / Escala do Efeito <span class="value-badge" id="res-value">12</span></label>
+      <input type="range" id="res-slider" min="4" max="32" value="12" step="1">
+    </div>
+
+    <div class="control-group">
+      <label>Parâmetro Específico (Amplitude/Brilho) <span class="value-badge" id="param-value">50</span></label>
+      <input type="range" id="param-slider" min="1" max="100" value="50" step="1">
+    </div>
+
+    <div class="control-group">
+      <label>Parâmetro Matemático (Freq/Amortecimento) <span class="value-badge" id="math-value">50</span></label>
+      <input type="range" id="math-slider" min="1" max="100" value="50" step="1">
+    </div>
+
+    <hr style="border: 1px solid #333; width: 100%;">
+
+    <button class="btn" id="btn-image">Exportar Imagem (.png)</button>
+    <button class="btn btn-record" id="btn-video">Gravar Vídeo (Máx 30s)</button>
+    <label id="recording-status" style="color: #ff4d4d; display: none; text-align: center; font-weight: bold;">A gravar...</label>
+  </div>
+
+  <div id="canvas-container"></div>
+
+  <script>
+    let media;
+    let mediaType = '';
+    let mediaReady = false;          // só desenhamos quando os pixels existirem
+    let currentObjectURL = null;     // para libertar memória ao trocar de ficheiro
+
+    let modeSelect, resSlider, paramSlider, mathSlider;
+
+    const density = "Ñ@#W$9876543210?!abc;:+=-,._ ".split("");
+
+    let mediaRecorder;
+    let recordedChunks = [];
+    let isRecording = false;
+    let recordingTimeout;
+
+    // Limite de resolução de amostragem (mantém o desempenho com vídeos/imagens grandes)
+    const SAMPLE_WIDTH = 600;
+
+    function setup() {
+      let canvas = createCanvas(800, 600);
+      canvas.parent('canvas-container');
+      pixelDensity(1); // garante coerência entre amostragem, saveCanvas e captureStream
+
+      document.getElementById('file-input').addEventListener('change', handleFile);
+      modeSelect = document.getElementById('mode-select');
+      resSlider = document.getElementById('res-slider');
+      paramSlider = document.getElementById('param-slider');
+      mathSlider = document.getElementById('math-slider');
+
+      // Mostrar o valor atual de cada slider
+      bindSliderBadge(resSlider, 'res-value');
+      bindSliderBadge(paramSlider, 'param-value');
+      bindSliderBadge(mathSlider, 'math-value');
+
+      document.getElementById('btn-image').addEventListener('click', () => saveCanvas('exportacao_math', 'png'));
+      document.getElementById('btn-video').addEventListener('click', toggleRecording);
+
+      drawPlaceholder();
+    }
+
+    function bindSliderBadge(slider, badgeId) {
+      const badge = document.getElementById(badgeId);
+      const update = () => badge.textContent = slider.value;
+      slider.addEventListener('input', update);
+      update();
+    }
+
+    function drawPlaceholder() {
+      background(30);
+      fill(255);
+      textAlign(CENTER, CENTER);
+      textSize(20);
+      text("Carregue uma imagem ou vídeo.", width / 2, height / 2);
+    }
+
+    function draw() {
+      if (!media || !mediaReady) return;
+
+      media.loadPixels();
+      if (!media.pixels || media.pixels.length === 0) return; // frame de vídeo ainda não disponível
+
+      background(15);
+
+      let stepSize = parseInt(resSlider.value);
+      let extraParam = parseInt(paramSlider.value);
+      let mathParam = parseInt(mathSlider.value);
+      let mode = modeSelect.value;
+
+      let mediaW = media.width;
+      let mediaH = media.height;
+
+      let aspect = mediaW / mediaH;
+      let drawW = width;
+      let drawH = width / aspect;
+      if (drawH > height) {
+        drawH = height;
+        drawW = height * aspect;
+      }
+      let offsetX = (width - drawW) / 2;
+      let offsetY = (height - drawH) / 2;
+
+      noStroke();
+
+      // Cores para o modo Lerp+Smoothstep
+      let colorDark = color('#0a0a2a');
+      let colorLight = color('#ff5500');
+
+      // Centro da imagem para oscilações radiais
+      let centerX = mediaW / 2;
+      let centerY = mediaH / 2;
+
+      // Partículas requerem desenho não estruturado
+      if (mode === 'particles') {
+        let densityParam = map(extraParam, 1, 100, 100, 5000);
+        let sizeMod = map(mathParam, 1, 100, 0.5, 3);
+        for (let i = 0; i < densityParam; i++) {
+          let x = floor(random(mediaW));
+          let y = floor(random(mediaH));
+          let index = (x + y * mediaW) * 4;
+          let r = media.pixels[index];
+          let g = media.pixels[index + 1];
+          let b = media.pixels[index + 2];
+          let bright = (r + g + b) / 3;
+          if (random(255) > bright) {
+            fill(r, g, b, 180);
+            let px = map(x, 0, mediaW, offsetX, offsetX + drawW);
+            let py = map(y, 0, mediaH, offsetY, offsetY + drawH);
+            circle(px, py, (stepSize / 2) * sizeMod);
+          }
+        }
+        return; // Termina execução de frame aqui para modo partículas
+      }
+
+      // Espiral Arquimediana (coordenadas polares, não grelha XY clássica)
+      if (mode === 'spiral') {
+        let spacing = map(mathParam, 1, 100, 2, 20);
+        let thicknessMulti = map(extraParam, 1, 100, 0.5, 3);
+        let maxRadius = dist(0, 0, mediaW / 2, mediaH / 2);
+
+        for (let r = 0; r < maxRadius; r += 0.8) {
+          let theta = r / (spacing * 0.1);
+          let x = mediaW / 2 + r * cos(theta);
+          let y = mediaH / 2 + r * sin(theta);
+
+          if (x >= 0 && x < mediaW && y >= 0 && y < mediaH) {
+            let index = (floor(x) + floor(y) * mediaW) * 4;
+            let rCol = media.pixels[index];
+            let gCol = media.pixels[index + 1];
+            let bCol = media.pixels[index + 2];
+            let br = (rCol + gCol + bCol) / 3;
+            let weight = map(br, 0, 255, spacing * thicknessMulti, 0);
+            fill(rCol, gCol, bCol);
+            let px = map(x, 0, mediaW, offsetX, offsetX + drawW);
+            let py = map(y, 0, mediaH, offsetY, offsetY + drawH);
+            circle(px, py, weight);
+          }
+        }
+        return;
+      }
+
+      // Largura mapeada de um passo da grelha (constante para todos os modos de grelha)
+      let mappedW = (stepSize / mediaW) * drawW;
+
+      // Processamento principal em Grelha (para todos os restantes modos)
+      for (let y = 0; y < mediaH; y += stepSize) {
+        let prevX = null, prevY = null; // Para ondas
+
+        for (let x = 0; x < mediaW; x += stepSize) {
+          let index = (x + y * mediaW) * 4;
+          let r = media.pixels[index];
+          let g = media.pixels[index + 1];
+          let b = media.pixels[index + 2];
+          let brightness = (r + g + b) / 3;
+
+          let px = map(x, 0, mediaW, offsetX, offsetX + drawW);
+          let py = map(y, 0, mediaH, offsetY, offsetY + drawH);
+
+          if (mode === 'lissajous') {
+            // Fórmulas Órbita/Lissajous
+            let a = map(mathParam, 1, 100, 1, 5); // Frequência X
+            let c = map(mathParam, 1, 100, 2, 6); // Frequência Y
+            let amp = map(brightness, 0, 255, 0, mappedW * map(extraParam, 1, 100, 0.5, 3));
+            let t = frameCount * 0.05 + (x + y) * 0.01; // Tempo + desfasamento no espaço
+
+            let lx = px + amp * sin(a * t + PI / 2);
+            let ly = py + amp * sin(c * t);
+
+            fill(r, g, b);
+            circle(lx, ly, mappedW * 0.4);
+          }
+          else if (mode === 'smoothstep') {
+            // Smoothstep + Lerp (Interpolação de cor com threshold dramático)
+            let t = brightness / 255.0;
+            // Equação smoothstep: 3t^2 - 2t^3
+            t = 3 * (t * t) - 2 * (t * t * t);
+
+            // Permite ajustar com os parâmetros
+            let threshold = map(extraParam, 1, 100, -0.5, 0.5);
+            t = constrain(t + threshold, 0, 1);
+
+            let finalColor = lerpColor(colorDark, colorLight, t);
+            let size = map(mathParam, 1, 100, mappedW * 0.5, mappedW * 1.5);
+
+            fill(finalColor);
+            rectMode(CENTER);
+            rect(px, py, size * t, size * t);
+            rectMode(CORNER);
+          }
+          else if (mode === 'ripple') {
+            // Oscilação Amortecida
+            let distCenter = dist(x, y, centerX, centerY);
+            let lambda = map(mathParam, 1, 100, 0.001, 0.05); // Amortecimento
+            let omega = map(extraParam, 1, 100, 0.05, 0.5);   // Frequência
+
+            // x(t) = A * e^(-lambda*d) * sin(omega*d - t)
+            let amplitudeBase = map(brightness, 0, 255, 0, stepSize * 2);
+            let wave = amplitudeBase * exp(-lambda * distCenter) * sin(omega * distCenter - frameCount * 0.1);
+
+            let rx = map(x + wave, 0, mediaW, offsetX, offsetX + drawW);
+            let ry = map(y + wave, 0, mediaH, offsetY, offsetY + drawH);
+
+            fill(r, g, b, 200);
+            circle(rx, ry, mappedW * 0.8);
+          }
+          else if (mode === 'easing') {
+            // Ease-In Quad: t^2
+            let t = brightness / 255.0;
+            let easeQuad = t * t;
+
+            let maxRadius = map(extraParam, 1, 100, mappedW * 0.5, mappedW * 3.0);
+            let spaceMod = map(mathParam, 1, 100, 1, 0.2); // Altera o aspeto da grelha
+
+            let size = maxRadius * easeQuad;
+            fill(r, g, b);
+            circle(px * spaceMod + (width * (1 - spaceMod) / 2), py, size);
+          }
+          else if (mode === 'waves') {
+            let freq = map(mathParam, 1, 100, 0.02, 0.5);
+            let ampBase = map(extraParam, 1, 100, 2, 30);
+            let amp = map(brightness, 0, 255, ampBase, 0);
+            let dy = sin(x * freq + frameCount * 0.05) * amp;
+
+            let pyy = map(y + dy, 0, mediaH, offsetY, offsetY + drawH);
+            if (prevX !== null) {
+              stroke(r, g, b);
+              strokeWeight(mappedW * 0.4);
+              line(prevX, prevY, px, pyy);
+              noStroke();
+            }
+            prevX = px; prevY = pyy;
+          }
+          else if (mode === 'mesh') {
+            let deform = map(mathParam, 1, 100, 0, stepSize);
+            let dx = map(brightness, 0, 255, -deform, deform);
+            let dy = map(brightness, 0, 255, -deform, deform);
+
+            let px1 = map(x + dx, 0, mediaW, offsetX, offsetX + drawW);
+            let py1 = map(y + dy, 0, mediaH, offsetY, offsetY + drawH);
+            let px2 = map(x + stepSize, 0, mediaW, offsetX, offsetX + drawW);
+            let py2 = map(y, 0, mediaH, offsetY, offsetY + drawH);
+            let px3 = map(x, 0, mediaW, offsetX, offsetX + drawW);
+            let py3 = map(y + stepSize, 0, mediaH, offsetY, offsetY + drawH);
+
+            fill(r, g, b, map(extraParam, 1, 100, 50, 255));
+            stroke(255, 30);
+            strokeWeight(0.5);
+            triangle(px1, py1, px2, py2, px3, py3);
+            noStroke();
+          }
+          else if (mode === 'ascii') {
+            let charIndex = floor(map(brightness, 0, 255, density.length - 1, 0));
+            let threshold = map(extraParam, 1, 100, 0, 255);
+            if (brightness < threshold) {
+              fill(r, g, b);
+              textSize(mappedW * map(mathParam, 1, 100, 0.5, 2));
+              textAlign(CENTER, CENTER);
+              text(density[charIndex], px, py);
+            }
+          }
+          else if (mode === 'circles') {
+            let rSize = map(brightness, 0, 255, 0, mappedW * map(extraParam, 1, 100, 0.1, 2.0));
+            fill(r, g, b);
+            circle(px, py, rSize);
+          }
+          else if (mode === 'lines') {
+            let lWeight = map(brightness, 0, 255, 0, mappedW * map(extraParam, 1, 100, 0.1, 3.0));
+            stroke(r, g, b);
+            strokeWeight(lWeight);
+            line(px, py, px + mappedW, py + mappedW);
+            noStroke();
+          }
+        }
+      }
+    }
+
+    function handleFile(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      // Liberta o media e o URL anteriores
+      cleanupMedia();
+
+      currentObjectURL = URL.createObjectURL(file);
+      mediaReady = false;
+
+      if (file.type.startsWith('image/')) {
+        mediaType = 'image';
+        loadImage(
+          currentObjectURL,
+          img => {
+            media = img;
+            media.resize(SAMPLE_WIDTH, 0); // limita a resolução de amostragem
+            mediaReady = true;
+          },
+          () => {
+            alert('Não foi possível carregar a imagem.');
+            drawPlaceholder();
+          }
+        );
+      } else if (file.type.startsWith('video/')) {
+        mediaType = 'video';
+        media = createVideo([currentObjectURL], () => {
+          media.loop();
+          media.volume(0);
+          media.hide();
+          // Limita a resolução de amostragem mantendo o rácio de aspeto
+          let vAspect = media.width / media.height;
+          if (media.width > SAMPLE_WIDTH) {
+            media.size(SAMPLE_WIDTH, Math.round(SAMPLE_WIDTH / vAspect));
+          }
+          mediaReady = true;
+        });
+      } else {
+        alert('Tipo de ficheiro não suportado. Use imagem ou vídeo.');
+      }
+    }
+
+    function cleanupMedia() {
+      // p5.MediaElement (vídeo) tem .remove(); p5.Image não tem — daí a verificação
+      if (media && typeof media.remove === 'function') {
+        media.remove();
+      }
+      media = null;
+      mediaReady = false;
+      if (currentObjectURL) {
+        URL.revokeObjectURL(currentObjectURL);
+        currentObjectURL = null;
+      }
+    }
+
+    function toggleRecording() {
+      if (!isRecording) startRecording();
+      else stopRecording();
+    }
+
+    function startRecording() {
+      if (!media || !mediaReady) {
+        alert('Carregue uma imagem ou vídeo antes de gravar.');
+        return;
+      }
+
+      recordedChunks = [];
+      let canvasElt = document.querySelector('#canvas-container canvas');
+      if (!canvasElt || typeof canvasElt.captureStream !== 'function') {
+        alert('O navegador não suporta a captura do canvas.');
+        return;
+      }
+      let stream = canvasElt.captureStream(30);
+
+      // Escolhe o melhor mimeType suportado pelo navegador
+      const candidates = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm'];
+      let options = {};
+      for (const mime of candidates) {
+        if (typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported(mime)) {
+          options = { mimeType: mime };
+          break;
+        }
+      }
+
+      try {
+        mediaRecorder = new MediaRecorder(stream, options);
+      } catch (e) {
+        try {
+          mediaRecorder = new MediaRecorder(stream);
+        } catch (e2) {
+          alert('Gravação não suportada neste navegador.');
+          return;
+        }
+      }
+
+      mediaRecorder.ondataavailable = function(e) {
+        if (e.data.size > 0) recordedChunks.push(e.data);
+      };
+
+      mediaRecorder.onstop = exportVideo;
+      mediaRecorder.start();
+      isRecording = true;
+
+      document.getElementById('btn-video').innerText = "Parar Gravação";
+      document.getElementById('recording-status').style.display = "block";
+      document.getElementById('btn-image').disabled = true;
+
+      recordingTimeout = setTimeout(stopRecording, 30000);
+    }
+
+    function stopRecording() {
+      if (mediaRecorder && isRecording) {
+        mediaRecorder.stop();
+        clearTimeout(recordingTimeout);
+        isRecording = false;
+
+        document.getElementById('btn-video').innerText = "Gravar Vídeo (Máx 30s)";
+        document.getElementById('recording-status').style.display = "none";
+        document.getElementById('btn-image').disabled = false;
+      }
+    }
+
+    function exportVideo() {
+      if (recordedChunks.length === 0) return;
+      let blob = new Blob(recordedChunks, { type: 'video/webm' });
+      let url = URL.createObjectURL(blob);
+      let a = document.createElement('a');
+      document.body.appendChild(a);
+      a.style.display = 'none';
+      a.href = url;
+      a.download = 'exportacao_math_cinematica.webm';
+      a.click();
+      // Limpeza após o download
+      setTimeout(() => {
+        URL.revokeObjectURL(url);
+        a.remove();
+      }, 100);
+    }
+  </script>
+</body>
+</html>
