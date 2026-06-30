@@ -1,8 +1,32 @@
 # Character Line-Art Prompt Builder
 
-A small [Streamlit](https://streamlit.io) app that turns the generic spec in
+Turns the generic spec in
 [`../character_image_style.schema.json`](../character_image_style.schema.json)
-into a ready-to-use image prompt.
+into a ready-to-use image prompt. Two interchangeable front-ends, same logic:
+
+| File | Best for | Needs |
+|------|----------|-------|
+| [`index.html`](index.html) | **Mobile / phone**, offline, zero install | just a browser |
+| [`app.py`](app.py) | Desktop / Python users | `pip install streamlit` |
+
+## Mobile (HTML) — recommended for phones
+
+`index.html` is a single self-contained file (no server, no build). Use it by either:
+
+- **Opening it directly** — email/AirDrop/save the file to your phone and open it
+  in your browser; or
+- **Hosting it** anywhere static (GitHub Pages, Netlify, or any web server) and
+  bookmarking the URL — then "Add to Home Screen" for an app-like icon.
+
+It's mobile-first (responsive layout, 16px inputs to avoid iOS zoom, copy-to-clipboard
+buttons, and it remembers your last entry via the browser). It has the **same fields**
+as the Streamlit version, compiles the **same prompt**, and can download the JSON.
+
+It also includes an optional collapsible **Generate image** section where you paste
+*your own* OpenAI key (kept in your browser's localStorage, sent directly to OpenAI) —
+leave it blank to stay in compile-only mode.
+
+## Desktop (Streamlit)
 
 Fill in the form (physical / psychological / professional traits), click
 **Compile prompt**, and you get:

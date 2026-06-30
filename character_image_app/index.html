@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#B026FF" />
+<title>Character Line-Art Prompt Builder</title>
+<style>
+  :root{
+    --purple:#B026FF; --purple-dk:#7d12b8; --bg:#faf7ff; --card:#ffffff;
+    --line:#e7d9f7; --text:#2a1a3a; --muted:#7a6a8a;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  body{
+    margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    background:var(--bg);color:var(--text);line-height:1.45;
+    padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  }
+  header{background:var(--purple);color:#fff;padding:18px 16px;position:sticky;top:0;z-index:10;
+    box-shadow:0 2px 10px rgba(176,38,255,.25)}
+  header h1{margin:0;font-size:1.15rem;display:flex;align-items:center;gap:8px}
+  header p{margin:4px 0 0;font-size:.78rem;opacity:.9}
+  main{max-width:680px;margin:0 auto;padding:14px}
+  fieldset{border:1px solid var(--line);border-radius:14px;background:var(--card);
+    margin:0 0 14px;padding:14px}
+  legend{color:var(--purple-dk);font-weight:700;font-size:.82rem;text-transform:uppercase;
+    letter-spacing:.04em;padding:0 6px}
+  label{display:block;font-size:.8rem;color:var(--muted);margin:10px 0 4px;font-weight:600}
+  input,select,textarea{
+    width:100%;font-size:16px;/* 16px stops iOS zoom-on-focus */
+    padding:11px 12px;border:1px solid var(--line);border-radius:10px;background:#fff;
+    color:var(--text);font-family:inherit}
+  input:focus,select:focus,textarea:focus{outline:2px solid var(--purple);border-color:var(--purple)}
+  .row{display:grid;gap:10px}
+  @media(min-width:520px){.row.two{grid-template-columns:1fr 1fr}.row.three{grid-template-columns:1fr 1fr 1fr}}
+  .check{display:flex;align-items:center;gap:8px;margin-top:26px}
+  .check input{width:auto}
+  button{font-size:1rem;font-weight:700;border:none;border-radius:12px;padding:14px;
+    width:100%;cursor:pointer}
+  .primary{background:var(--purple);color:#fff;box-shadow:0 3px 10px rgba(176,38,255,.35)}
+  .primary:active{transform:translateY(1px)}
+  .ghost{background:#fff;color:var(--purple-dk);border:1.5px solid var(--purple)}
+  #out{display:none;margin-top:6px}
+  .outcard{border:1px solid var(--line);border-radius:14px;background:var(--card);padding:14px;margin-bottom:14px}
+  .outcard h2{margin:0 0 8px;font-size:.9rem;color:var(--purple-dk)}
+  pre{white-space:pre-wrap;word-break:break-word;background:#f4ecfd;border-radius:10px;
+    padding:12px;font-size:.82rem;margin:0;max-height:340px;overflow:auto}
+  .btnrow{display:grid;gap:8px;margin-top:10px}
+  @media(min-width:520px){.btnrow{grid-template-columns:1fr 1fr}}
+  .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--purple-dk);
+    color:#fff;padding:10px 18px;border-radius:999px;font-size:.85rem;opacity:0;pointer-events:none;
+    transition:opacity .25s;z-index:50}
+  .toast.show{opacity:1}
+  details{margin-top:4px}
+  summary{cursor:pointer;color:var(--muted);font-size:.8rem;font-weight:600}
+  .hint{font-size:.72rem;color:var(--muted);margin-top:6px}
+</style>
+</head>
+<body>
+<header>
+  <h1>🎭 Character Line-Art Prompt Builder</h1>
+  <p>Fill the traits → compile a prompt in the locked purple line-art style.</p>
+</header>
+
+<main>
+  <form id="f">
+    <fieldset>
+      <legend>Identity</legend>
+      <div class="row two">
+        <div><label>Name</label><input id="name" placeholder="e.g. Elvis Presley" required></div>
+        <div><label>Type</label>
+          <select id="type"><option>person</option><option>fictional_character</option><option>archetype</option></select>
+        </div>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Physical</legend>
+      <div class="row three">
+        <div><label>Sex / gender</label><input id="sex" placeholder="male / female / …"></div>
+        <div><label>Approx. age</label><input id="age" placeholder="late 30s"></div>
+        <div><label>Build</label>
+          <select id="build"><option>slim</option><option>average</option><option selected>athletic</option><option>heavyset</option><option>tall_and_lean</option><option>broad</option></select>
+        </div>
+      </div>
+      <div class="row three">
+        <div><label>Height value</label><input id="hval" placeholder="6'0&quot;"></div>
+        <div><label>Unit</label><select id="hunit"><option>ft_in</option><option>m</option><option>cm</option></select></div>
+        <div class="check"><input type="checkbox" id="hshow" checked><label style="margin:0">Show on drawing</label></div>
+      </div>
+      <div><label>Height annotation text</label><input id="hfmt" placeholder="6'0&quot; | 1.83 m"></div>
+      <div class="row three">
+        <div><label>Hair style</label><input id="hair" placeholder="pompadour"></div>
+        <div><label>Hair length</label><input id="hairlen" placeholder="medium"></div>
+        <div><label>Facial hair</label><input id="beard" placeholder="sideburns / none"></div>
+      </div>
+      <div><label>Posture</label>
+        <select id="posture"><option>upright</option><option>hunched</option><option>relaxed</option><option>imposing</option><option>poised</option><option>dynamic</option></select>
+      </div>
+      <div><label>Distinguishing features (comma-separated)</label><input id="feats" placeholder="high collar, wide belt"></div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Psychological</legend>
+      <div class="row two">
+        <div><label>Demeanor</label>
+          <select id="demeanor"><option>calm</option><option>menacing</option><option selected>charismatic</option><option>shy</option><option>confident</option><option>eccentric</option><option>playful</option><option>brooding</option></select>
+        </div>
+        <div><label>Energy level</label>
+          <select id="energy"><option>static</option><option>composed</option><option selected>dynamic</option><option>theatrical</option></select>
+        </div>
+      </div>
+      <div><label>Personality traits (comma-separated)</label><input id="traits" placeholder="charismatic, flamboyant"></div>
+      <div><label>Signature attitude</label><input id="attitude" placeholder="showman caught mid-song"></div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Professional</legend>
+      <div class="row two">
+        <div><label>Occupation</label><input id="occ" placeholder="rock 'n' roll singer"></div>
+        <div><label>Era</label><input id="era" placeholder="1970s Las Vegas"></div>
+      </div>
+      <div><label>Wardrobe (comma-separated)</label><input id="wardrobe" placeholder="jumpsuit, deep V-neck, bell-bottoms"></div>
+      <div><label>Iconic props (comma-separated)</label><input id="props" placeholder="microphone"></div>
+      <div><label>Signature action / pose</label><input id="pose" placeholder="leaning back singing into a handheld mic"></div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Composition</legend>
+      <div class="row two">
+        <div><label>Views</label>
+          <select id="views" multiple size="3" style="height:auto">
+            <option selected>front</option><option>profile</option><option>signature_action</option>
+          </select>
+          <div class="hint">Tap to multi-select.</div>
+        </div>
+        <div><label>Name label style</label>
+          <select id="title"><option>bold_label</option><option>banner</option><option>none</option></select>
+        </div>
+      </div>
+    </fieldset>
+
+    <button type="submit" class="primary">⚡ Compile prompt</button>
+  </form>
+
+  <section id="out">
+    <div class="outcard">
+      <h2>📝 Final prompt</h2>
+      <pre id="prompt"></pre>
+      <div class="btnrow">
+        <button type="button" class="ghost" onclick="copyText('prompt')">📋 Copy prompt</button>
+        <button type="button" class="ghost" onclick="copyText('json')">📋 Copy JSON</button>
+      </div>
+      <div class="btnrow">
+        <button type="button" class="ghost" onclick="downloadJSON()">⬇ Download JSON</button>
+      </div>
+    </div>
+    <div class="outcard">
+      <h2>🧩 Populated JSON</h2>
+      <pre id="json"></pre>
+    </div>
+    <div class="outcard">
+      <details>
+        <summary>🖼 Optional: generate an image (uses your own OpenAI key)</summary>
+        <label>OpenAI API key (stored only in this browser)</label>
+        <input id="key" type="password" placeholder="sk-…">
+        <button type="button" class="primary" style="margin-top:10px" onclick="genImage()">Generate with gpt-image-1</button>
+        <div class="hint">The key is kept in your browser's localStorage and sent directly to OpenAI. Leave blank to stay in compile-only mode.</div>
+        <div id="imgwrap" style="margin-top:12px"></div>
+      </details>
+    </div>
+  </section>
+</main>
+
+<div id="toast" class="toast"></div>
+
+<script>
+const STROKE_HEX = "#B026FF";
+const STROKE_NAME = "vivid violet / electric purple";
+const ART_STYLE = {
+  medium:"vector line art / contour drawing",
+  technique:"single-weight outline strokes, no shading, no fills",
+  line:{color_primary:STROKE_HEX, color_name:STROKE_NAME, fill:"none"},
+  palette:{scheme:"monochromatic", stroke:STROKE_HEX, background:"#FFFFFF"},
+  face_treatment:{detail_level:"minimal"}
+};
+
+const $ = id => document.getElementById(id);
+const csv = v => v.split(",").map(s=>s.trim()).filter(Boolean);
+const list = a => a.filter(Boolean).join(", ") || "none";
+
+function buildSpec(){
+  const views = [...$("views").selectedOptions].map(o=>o.value);
+  return {
+    art_style: ART_STYLE,
+    subject:{
+      name:$("name").value.trim(), type:$("type").value,
+      physical:{
+        sex_gender_presentation:$("sex").value, approx_age:$("age").value,
+        height:{value:$("hval").value, unit:$("hunit").value, show_on_drawing:$("hshow").checked},
+        build:$("build").value,
+        hair:{style:$("hair").value, length:$("hairlen").value, facial_hair:$("beard").value},
+        distinguishing_features:csv($("feats").value), posture:$("posture").value
+      },
+      psychological:{
+        personality_traits:csv($("traits").value), demeanor:$("demeanor").value,
+        energy_level:$("energy").value, signature_attitude:$("attitude").value
+      },
+      professional:{
+        occupation:$("occ").value, era:$("era").value,
+        wardrobe:csv($("wardrobe").value), iconic_props:csv($("props").value),
+        signature_action_or_pose:$("pose").value
+      }
+    },
+    composition:{
+      views:{count:views.length||1, options_used:views.length?views:["front"]},
+      title:{style:$("title").value},
+      annotations:{height_dimension:{show:$("hshow").checked, format:$("hfmt").value}}
+    }
+  };
+}
+
+function compilePrompt(spec){
+  const s=spec.subject, ph=s.physical, ps=s.psychological, pr=s.professional, c=spec.composition;
+  const views=c.views.options_used;
+  const beard=(ph.hair.facial_hair||"").trim();
+  const beardClause=(beard && beard.toLowerCase()!=="none") ? " and "+beard : "";
+  let heightClause="";
+  const hd=c.annotations.height_dimension;
+  if(ph.height.show_on_drawing && hd.show && (hd.format||"").trim())
+    heightClause=", and a small top-left height annotation reading "+hd.format.trim();
+  let titleClause;
+  if(c.title.style==="banner") titleClause=`Add a purple top banner with a star icon and the name "${s.name}" in bold white`;
+  else if(c.title.style==="bold_label") titleClause=`Add a bold purple name label "${s.name}"`;
+  else titleClause="No name label";
+  return `Minimalist single-color line-art illustration in a clean architectural scale-figure / dimensions.com style. `+
+    `Subject: ${s.name} — ${pr.occupation}, ${pr.era}. Draw a full-body figure (${views.length} view(s): ${views.join(", ")}) `+
+    `using uniform-weight ${STROKE_NAME} (${STROKE_HEX}) outline strokes only, NO fills, NO shading, on a pure white background. `+
+    `Face is minimal/featureless; identity carried by silhouette, ${ph.hair.style} hair${beardClause}, ${ph.build} build and ${ph.posture} posture. `+
+    `Wardrobe: ${list(pr.wardrobe)}. Props: ${list(pr.iconic_props)}. `+
+    `Pose conveys a ${ps.demeanor}, ${ps.energy_level} attitude via ${pr.signature_action_or_pose}. `+
+    `Include a dashed horizontal ground baseline${heightClause}. ${titleClause}. `+
+    `Flat 2D orthographic, infographic aesthetic. Avoid: any color besides the purple stroke, gradients, photorealism, detailed faces.`;
+}
+
+$("f").addEventListener("submit", e=>{
+  e.preventDefault();
+  if(!$("name").value.trim()){toast("Please enter a name");return;}
+  const spec=buildSpec();
+  $("prompt").textContent=compilePrompt(spec);
+  $("json").textContent=JSON.stringify(spec,null,2);
+  $("out").style.display="block";
+  localStorage.setItem("clab_last", JSON.stringify(spec));
+  $("out").scrollIntoView({behavior:"smooth"});
+});
+
+function copyText(id){
+  navigator.clipboard.writeText($(id).textContent).then(()=>toast("Copied!"),()=>toast("Copy failed"));
+}
+function downloadJSON(){
+  const name=($("name").value.trim()||"character").toLowerCase().replace(/\s+/g,"_");
+  const blob=new Blob([$("json").textContent],{type:"application/json"});
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(blob); a.download=name+"_spec.json"; a.click();
+  URL.revokeObjectURL(a.href);
+}
+let t;
+function toast(msg){const el=$("toast");el.textContent=msg;el.classList.add("show");
+  clearTimeout(t);t=setTimeout(()=>el.classList.remove("show"),1600);}
+
+// Optional client-side image generation
+async function genImage(){
+  const key=$("key").value.trim();
+  if(!key){toast("Enter an API key first");return;}
+  localStorage.setItem("clab_key", key);
+  const prompt=$("prompt").textContent;
+  if(!prompt){toast("Compile a prompt first");return;}
+  $("imgwrap").innerHTML="<p class='hint'>Generating…</p>";
+  try{
+    const r=await fetch("https://api.openai.com/v1/images/generations",{
+      method:"POST",
+      headers:{"Content-Type":"application/json","Authorization":"Bearer "+key},
+      body:JSON.stringify({model:"gpt-image-1",prompt,size:"1024x1536",n:1})
+    });
+    const d=await r.json();
+    if(!r.ok) throw new Error(d.error?.message||("HTTP "+r.status));
+    const b64=d.data[0].b64_json;
+    $("imgwrap").innerHTML=`<img src="data:image/png;base64,${b64}" style="width:100%;border-radius:10px">`;
+  }catch(err){$("imgwrap").innerHTML="<p class='hint' style='color:#c00'>"+err.message+"</p>";}
+}
+
+// Restore last session
+(function(){
+  const saved=localStorage.getItem("clab_last");
+  if(saved){try{
+    const s=JSON.parse(saved), p=s.subject.physical, ps=s.subject.psychological, pr=s.subject.professional;
+    $("name").value=s.subject.name||""; $("type").value=s.subject.type||"person";
+    $("sex").value=p.sex_gender_presentation||""; $("age").value=p.approx_age||"";
+    $("build").value=p.build||"athletic"; $("hval").value=p.height.value||"";
+    $("hunit").value=p.height.unit||"ft_in"; $("hshow").checked=!!p.height.show_on_drawing;
+    $("hfmt").value=s.composition.annotations.height_dimension.format||"";
+    $("hair").value=p.hair.style||""; $("hairlen").value=p.hair.length||""; $("beard").value=p.hair.facial_hair||"";
+    $("posture").value=p.posture||"upright"; $("feats").value=(p.distinguishing_features||[]).join(", ");
+    $("demeanor").value=ps.demeanor||"charismatic"; $("energy").value=ps.energy_level||"dynamic";
+    $("traits").value=(ps.personality_traits||[]).join(", "); $("attitude").value=ps.signature_attitude||"";
+    $("occ").value=pr.occupation||""; $("era").value=pr.era||"";
+    $("wardrobe").value=(pr.wardrobe||[]).join(", "); $("props").value=(pr.iconic_props||[]).join(", ");
+    $("pose").value=pr.signature_action_or_pose||"";
+    const vu=s.composition.views.options_used||[];
+    [...$("views").options].forEach(o=>o.selected=vu.includes(o.value));
+    $("title").value=s.composition.title.style||"bold_label";
+  }catch(e){}}
+  const k=localStorage.getItem("clab_key"); if(k)$("key").value=k;
+})();
+</script>
+</body>
+</html>
