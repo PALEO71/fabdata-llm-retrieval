@@ -22,6 +22,10 @@ It's mobile-first (responsive layout, 16px inputs to avoid iOS zoom, copy-to-cli
 buttons, and it remembers your last entry via the browser). It has the **same fields**
 as the Streamlit version, compiles the **same prompt**, and can download the JSON.
 
+**One-tap presets:** chips at the top load a fully filled-in **Elvis Presley**,
+**Dracula**, or **Charles Darwin** (and a **Clear** button) — so on a phone you can
+load an example and just tweak a few fields instead of typing everything.
+
 It also includes an optional collapsible **Generate image** section where you paste
 *your own* OpenAI key (kept in your browser's localStorage, sent directly to OpenAI) —
 leave it blank to stay in compile-only mode.

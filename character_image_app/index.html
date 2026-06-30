@@ -54,6 +54,12 @@
   details{margin-top:4px}
   summary{cursor:pointer;color:var(--muted);font-size:.8rem;font-weight:600}
   .hint{font-size:.72rem;color:var(--muted);margin-top:6px}
+  .presets{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 14px}
+  .presets .lbl{width:100%;font-size:.78rem;color:var(--muted);font-weight:600}
+  .chip{background:#fff;border:1.5px solid var(--purple);color:var(--purple-dk);
+    border-radius:999px;padding:8px 14px;font-size:.85rem;font-weight:700;cursor:pointer;
+    flex:0 0 auto}
+  .chip:active{background:var(--purple);color:#fff}
 </style>
 </head>
 <body>
@@ -63,6 +69,13 @@
 </header>
 
 <main>
+  <div class="presets">
+    <span class="lbl">⚡ Load a preset, then tweak:</span>
+    <button type="button" class="chip" onclick="loadPreset('elvis')">Elvis Presley</button>
+    <button type="button" class="chip" onclick="loadPreset('dracula')">Dracula</button>
+    <button type="button" class="chip" onclick="loadPreset('darwin')">Charles Darwin</button>
+    <button type="button" class="chip" onclick="loadPreset('clear')">Clear</button>
+  </div>
   <form id="f">
     <fieldset>
       <legend>Identity</legend>
@@ -289,27 +302,72 @@ async function genImage(){
   }catch(err){$("imgwrap").innerHTML="<p class='hint' style='color:#c00'>"+err.message+"</p>";}
 }
 
+// Populate the whole form from a spec object
+function applySpec(s){
+  const p=s.subject.physical, ps=s.subject.psychological, pr=s.subject.professional;
+  $("name").value=s.subject.name||""; $("type").value=s.subject.type||"person";
+  $("sex").value=p.sex_gender_presentation||""; $("age").value=p.approx_age||"";
+  $("build").value=p.build||"athletic"; $("hval").value=p.height.value||"";
+  $("hunit").value=p.height.unit||"ft_in"; $("hshow").checked=!!p.height.show_on_drawing;
+  $("hfmt").value=s.composition.annotations.height_dimension.format||"";
+  $("hair").value=p.hair.style||""; $("hairlen").value=p.hair.length||""; $("beard").value=p.hair.facial_hair||"";
+  $("posture").value=p.posture||"upright"; $("feats").value=(p.distinguishing_features||[]).join(", ");
+  $("demeanor").value=ps.demeanor||"charismatic"; $("energy").value=ps.energy_level||"dynamic";
+  $("traits").value=(ps.personality_traits||[]).join(", "); $("attitude").value=ps.signature_attitude||"";
+  $("occ").value=pr.occupation||""; $("era").value=pr.era||"";
+  $("wardrobe").value=(pr.wardrobe||[]).join(", "); $("props").value=(pr.iconic_props||[]).join(", ");
+  $("pose").value=pr.signature_action_or_pose||"";
+  const vu=s.composition.views.options_used||[];
+  [...$("views").options].forEach(o=>o.selected=vu.includes(o.value));
+  $("title").value=s.composition.title.style||"bold_label";
+}
+
+// Build a spec object from compact preset fields
+function mk(o){
+  return {subject:{name:o.name,type:o.type,physical:{sex_gender_presentation:o.sex,approx_age:o.age,
+    height:{value:o.hval,unit:o.hunit||"ft_in",show_on_drawing:true},build:o.build,
+    hair:{style:o.hair,length:o.hairlen||"",facial_hair:o.beard||"none"},
+    distinguishing_features:o.feats||[],posture:o.posture},
+    psychological:{personality_traits:o.traits||[],demeanor:o.demeanor,energy_level:o.energy,signature_attitude:o.attitude},
+    professional:{occupation:o.occ,era:o.era,wardrobe:o.wardrobe||[],iconic_props:o.props||[],signature_action_or_pose:o.pose}},
+    composition:{views:{count:(o.views||["front"]).length,options_used:o.views||["front"]},
+    title:{style:o.title||"bold_label"},annotations:{height_dimension:{show:true,format:o.hfmt||""}}}};
+}
+
+const PRESETS={
+  elvis: mk({name:"Elvis Presley",type:"person",sex:"male",age:"late 30s",hval:"6'0\"",build:"athletic",
+    hair:"pompadour",hairlen:"medium",beard:"sideburns",posture:"dynamic",feats:["high collar","wide belt"],
+    demeanor:"charismatic",energy:"dynamic",traits:["charismatic","flamboyant","magnetic"],
+    attitude:"showman caught mid-song",occ:"rock 'n' roll singer",era:"1970s Las Vegas",
+    wardrobe:["jumpsuit","deep V-neck","wide belt","flared bell-bottoms"],props:["microphone"],
+    pose:"leaning back singing into a handheld mic",views:["signature_action"],title:"bold_label",hfmt:"6'0\" | 1.83 m"}),
+  dracula: mk({name:"Dracula",type:"fictional_character",sex:"male",age:"ageless / appears 40s",hval:"6'4\"",
+    build:"tall_and_lean",hair:"slicked-back",hairlen:"short",beard:"none",posture:"imposing",
+    feats:["high collar","flowing cape"],demeanor:"menacing",energy:"theatrical",
+    traits:["aristocratic","menacing","theatrical"],attitude:"looming, predatory elegance",
+    occ:"vampire count / aristocrat",era:"Victorian gothic",
+    wardrobe:["formal tuxedo","waistcoat","bow tie","high-collared cape"],props:["cape"],
+    pose:"arms raised spreading the cape wide",views:["front","profile","signature_action"],
+    title:"banner",hfmt:"6'4\" | 1.93 m"}),
+  darwin: mk({name:"Charles Darwin",type:"person",sex:"male",age:"elderly",hval:"5'11\"",build:"heavyset",
+    hair:"bald on top, long at the sides",hairlen:"long sides",beard:"full long beard",posture:"upright",
+    feats:["long overcoat","wide-brimmed hat"],demeanor:"calm",energy:"static",
+    traits:["thoughtful","reserved","scholarly"],attitude:"contemplative Victorian gentleman",
+    occ:"naturalist",era:"Victorian era",wardrobe:["long overcoat","waistcoat","trousers"],
+    props:["wide-brimmed hat held at side"],pose:"standing holding a hat at his side",
+    views:["front"],title:"bold_label",hfmt:"5'11\" | 1.80 m"})
+};
+
+function loadPreset(key){
+  if(key==="clear"){ $("f").reset(); localStorage.removeItem("clab_last"); toast("Cleared"); return; }
+  applySpec(PRESETS[key]);
+  toast(PRESETS[key].subject.name+" loaded");
+}
+
 // Restore last session
 (function(){
   const saved=localStorage.getItem("clab_last");
-  if(saved){try{
-    const s=JSON.parse(saved), p=s.subject.physical, ps=s.subject.psychological, pr=s.subject.professional;
-    $("name").value=s.subject.name||""; $("type").value=s.subject.type||"person";
-    $("sex").value=p.sex_gender_presentation||""; $("age").value=p.approx_age||"";
-    $("build").value=p.build||"athletic"; $("hval").value=p.height.value||"";
-    $("hunit").value=p.height.unit||"ft_in"; $("hshow").checked=!!p.height.show_on_drawing;
-    $("hfmt").value=s.composition.annotations.height_dimension.format||"";
-    $("hair").value=p.hair.style||""; $("hairlen").value=p.hair.length||""; $("beard").value=p.hair.facial_hair||"";
-    $("posture").value=p.posture||"upright"; $("feats").value=(p.distinguishing_features||[]).join(", ");
-    $("demeanor").value=ps.demeanor||"charismatic"; $("energy").value=ps.energy_level||"dynamic";
-    $("traits").value=(ps.personality_traits||[]).join(", "); $("attitude").value=ps.signature_attitude||"";
-    $("occ").value=pr.occupation||""; $("era").value=pr.era||"";
-    $("wardrobe").value=(pr.wardrobe||[]).join(", "); $("props").value=(pr.iconic_props||[]).join(", ");
-    $("pose").value=pr.signature_action_or_pose||"";
-    const vu=s.composition.views.options_used||[];
-    [...$("views").options].forEach(o=>o.selected=vu.includes(o.value));
-    $("title").value=s.composition.title.style||"bold_label";
-  }catch(e){}}
+  if(saved){try{ applySpec(JSON.parse(saved)); }catch(e){}}
   const k=localStorage.getItem("clab_key"); if(k)$("key").value=k;
 })();
 </script>
