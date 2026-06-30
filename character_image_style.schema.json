@@ -1,0 +1,192 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://fabdata.ai/schemas/character-image-style.schema.json",
+  "title": "Character Line-Art Image Generation Spec",
+  "description": "A generic, reusable specification for generating minimalist purple line-art character illustrations in the 'dimensions.com' architectural scale-figure style. Fill in the `subject` block and the `feature_mapping` rules translate a person's or character's physical, psychological and professional traits into concrete drawing features (pose, wardrobe, props, expression, composition). Designed to be passed to an image model directly, or compiled into a text prompt via `prompt_template`.",
+  "version": "1.0.0",
+
+  "art_style": {
+    "_comment": "Fixed style fingerprint extracted from the reference samples. Keep these constant to preserve the look; override only intentionally.",
+    "medium": "vector line art / contour drawing",
+    "technique": "single-weight outline strokes, no shading, no hatching, no fills",
+    "rendering": "flat 2D, orthographic (no perspective foreshortening), technical-illustration feel",
+    "line": {
+      "color_primary": "#B026FF",
+      "color_hex_alternatives": ["#A020F0", "#BE2EFF", "#9B30FF"],
+      "color_name": "vivid violet / electric purple",
+      "weight": "uniform medium stroke, ~2px at 1080px width",
+      "weight_variation": "none (consistent throughout)",
+      "join_style": "smooth rounded corners and joints",
+      "fill": "none — outlines only, interior left as background"
+    },
+    "palette": {
+      "scheme": "monochromatic",
+      "stroke": "#B026FF",
+      "background": "#FFFFFF",
+      "accents": "title banner and labels may use the same purple as a solid fill with white text"
+    },
+    "face_treatment": {
+      "detail_level": "minimal",
+      "description": "Faces are largely featureless or suggested with a few lines; identity is carried by silhouette, hair shape, posture and signature props rather than facial likeness.",
+      "allowed_features": ["hairline / hairstyle outline", "jaw / beard outline", "ear", "optional nose or brow hint"],
+      "avoid": ["detailed eyes", "skin texture", "photorealistic likeness"]
+    },
+    "level_of_detail": "low-to-medium; clothing folds and key accessories outlined, fine detail omitted",
+    "mood": "clean, modern, infographic / reference-chart aesthetic"
+  },
+
+  "subject": {
+    "_comment": "The ONLY block you normally edit. Describe the real person or fictional character here. Leave fields null/empty to let the model infer.",
+    "name": "",
+    "type": "person | fictional_character | archetype",
+    "physical": {
+      "sex_gender_presentation": "",
+      "approx_age": "",
+      "height": { "value": "", "unit": "ft_in | m | cm", "show_on_drawing": true },
+      "build": "slim | average | athletic | heavyset | tall_and_lean | broad",
+      "skin_tone_note": "ignored in line art, but may inform shading variant if enabled",
+      "hair": { "style": "", "length": "", "facial_hair": "" },
+      "distinguishing_features": ["", ""],
+      "posture": "upright | hunched | relaxed | imposing | poised"
+    },
+    "psychological": {
+      "_comment": "Drives pose dynamics, gesture, body language and composition energy.",
+      "personality_traits": ["", ""],
+      "demeanor": "calm | menacing | charismatic | shy | confident | eccentric | playful | brooding",
+      "energy_level": "static | composed | dynamic | theatrical",
+      "signature_attitude": ""
+    },
+    "professional": {
+      "_comment": "Drives wardrobe, props, and the signature/iconic pose.",
+      "occupation": "",
+      "era": "",
+      "wardrobe": ["", ""],
+      "iconic_props": ["", ""],
+      "signature_action_or_pose": ""
+    }
+  },
+
+  "feature_mapping": {
+    "_comment": "Deterministic rules that turn the `subject` traits into drawing features. The generator should apply these when composing the image and the prompt.",
+    "physical_to_drawing": {
+      "build": "Shape the silhouette/body outline width accordingly (e.g. 'broad' = wider shoulders and torso).",
+      "height": "Render proportionally and, if height.show_on_drawing, add the height dimension annotation (see composition.annotations).",
+      "hair_and_facial_hair": "Define the head silhouette with hairline and beard outlines — this is a primary identity cue given minimal faces.",
+      "posture": "Set the spine/stance line (upright, hunched, poised)."
+    },
+    "psychological_to_drawing": {
+      "demeanor": "Choose gesture and body language (e.g. menacing = looming forward, arms framing; shy = closed/inward posture; charismatic = open expansive stance).",
+      "energy_level": "Set pose dynamism: static = symmetric standing; theatrical = exaggerated signature gesture.",
+      "signature_attitude": "Bias the chosen pose toward an instantly recognizable attitude."
+    },
+    "professional_to_drawing": {
+      "wardrobe": "Outline the defining garments and their characteristic folds (suit lapels, cape, bell-bottom suit, gown).",
+      "iconic_props": "Include hand-held or worn props that signal the profession/identity (microphone, hat, cape).",
+      "signature_action_or_pose": "Use as the hero pose, especially for the primary/action view."
+    },
+    "priority": "When traits conflict, signature_action_or_pose and iconic_props win — recognizability over realism."
+  },
+
+  "composition": {
+    "_comment": "Layout, multi-view setup, annotations and labels matching the reference style.",
+    "background": "#FFFFFF",
+    "framing": "full-body, figure standing on a baseline, generous margins",
+    "ground_baseline": {
+      "show": true,
+      "style": "horizontal dashed line in stroke color across the bottom"
+    },
+    "views": {
+      "_comment": "1 to 3 figures side by side. Use multiple to show personality from different angles, like the samples.",
+      "count": 1,
+      "options": [
+        { "name": "front", "pose": "neutral standing, signature wardrobe" },
+        { "name": "profile", "pose": "side view, shows silhouette/posture" },
+        { "name": "signature_action", "pose": "the iconic profession/personality pose" }
+      ]
+    },
+    "annotations": {
+      "height_dimension": {
+        "show": true,
+        "placement": "top-left, small dashed tick with text",
+        "format": "{ft_in} | {m}",
+        "example": "6'4\" | 1.93 m",
+        "style": "small purple text, matching stroke color"
+      }
+    },
+    "title": {
+      "_comment": "Pick ONE style of name label, matching the samples.",
+      "style": "banner | bold_label | none",
+      "banner": {
+        "shape": "rounded rectangle, solid purple fill, full width at top",
+        "icon": "outlined star at left",
+        "text": "{subject.name}",
+        "text_style": "bold white sans-serif"
+      },
+      "bold_label": {
+        "placement": "centered below figure or large at top",
+        "text": "{subject.name}",
+        "text_style": "bold purple sans-serif"
+      }
+    }
+  },
+
+  "output": {
+    "format": "png | svg",
+    "aspect_ratio": "portrait 3:4 for single figure | landscape 4:3 or 16:9 for multi-view",
+    "resolution": "1080px on the long edge (recommended)",
+    "transparent_background": false,
+    "negative_constraints": [
+      "no color other than the purple stroke and white background",
+      "no shading, gradients, or fills",
+      "no photorealism or detailed facial features",
+      "no drop shadows except the dashed ground baseline",
+      "no textured or non-white background"
+    ]
+  },
+
+  "prompt_template": {
+    "_comment": "Compile the fields above into a single text prompt for an image model. {{...}} are substituted from this spec.",
+    "text": "Minimalist single-color line-art illustration in a clean architectural scale-figure / dimensions.com style. Subject: {{subject.name}} — {{subject.professional.occupation}}, {{subject.era}}. Draw a full-body figure ({{composition.views.count}} view(s): {{views_list}}) using uniform-weight {{art_style.line.color_name}} ({{art_style.line.color_primary}}) outline strokes only, NO fills, NO shading, on a pure white background. Face is minimal/featureless; identity carried by silhouette, {{subject.physical.hair.style}} hair{{facial_hair_clause}}, {{subject.physical.build}} build and posture. Wardrobe: {{subject.professional.wardrobe}}. Props: {{subject.professional.iconic_props}}. Pose conveys a {{subject.psychological.demeanor}}, {{subject.psychological.energy_level}} attitude via {{subject.professional.signature_action_or_pose}}. Include a dashed horizontal ground baseline{{height_clause}}. {{title_clause}}. Flat 2D orthographic, infographic aesthetic. Avoid: any color besides the purple stroke, gradients, photorealism, detailed faces.",
+    "substitution_notes": {
+      "facial_hair_clause": "if subject.physical.hair.facial_hair set: ' and ' + value + ' beard/moustache'",
+      "height_clause": "if subject.physical.height.show_on_drawing: ', and a small top-left height annotation reading ' + formatted height",
+      "title_clause": "based on composition.title.style: banner -> purple top banner with star icon and name in bold white; bold_label -> bold purple name label; none -> omit",
+      "views_list": "comma-joined names of the enabled views"
+    }
+  },
+
+  "example_instance": {
+    "_comment": "A fully filled-in example using the Dracula reference, to show how the template is populated.",
+    "subject": {
+      "name": "Dracula",
+      "type": "fictional_character",
+      "physical": {
+        "sex_gender_presentation": "male",
+        "approx_age": "ageless / appears 40s",
+        "height": { "value": "6'4\"", "unit": "ft_in", "show_on_drawing": true },
+        "build": "tall_and_lean",
+        "hair": { "style": "slicked-back", "length": "short", "facial_hair": "none" },
+        "distinguishing_features": ["high collar", "flowing cape"],
+        "posture": "imposing"
+      },
+      "psychological": {
+        "personality_traits": ["aristocratic", "menacing", "theatrical"],
+        "demeanor": "menacing",
+        "energy_level": "theatrical",
+        "signature_attitude": "looming, predatory elegance"
+      },
+      "professional": {
+        "occupation": "vampire count / aristocrat",
+        "era": "Victorian gothic",
+        "wardrobe": ["formal tuxedo", "waistcoat", "bow tie", "high-collared cape"],
+        "iconic_props": ["cape"],
+        "signature_action_or_pose": "arms raised spreading the cape wide"
+      }
+    },
+    "composition": {
+      "views": { "count": 3, "options_used": ["front", "profile", "signature_action"] },
+      "title": { "style": "banner" },
+      "annotations": { "height_dimension": { "show": true, "format": "6'4\" | 1.93 m" } }
+    }
+  }
+}
