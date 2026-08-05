@@ -210,6 +210,49 @@ class RedisDataStore(DataStore):
         data["metadata"] = redis_metadata
         return data
 
+    def _typ_to_str(self, typ, field, value) -> str:  # type: ignore
+        """
+        Convert a RediSearch field type + value into a query string fragment.
+        """
+        if isinstance(typ, TagField):
+            return f"@{typ.as_name}:{{{self._escape(value)}}} "
+        elif isinstance(typ, TextField):
+            return f"@{typ.as_name}:{self._escape(value)} "
+        elif isinstance(typ, NumericField):
+            num = to_unix_timestamp(value)
+            match field:
+                case "start_date":
+                    return f"@{typ.as_name}:[{num} +inf] "
+                case "end_date":
+                    return f"@{typ.as_name}:[-inf {num}] "
+
+    def _append_filters(
+        self, filter_str: str, filter: DocumentMetadataFilter, exclude: bool
+    ) -> str:
+        """
+        Append the RediSearch query fragments for every populated field
+        of a DocumentMetadataFilter onto filter_str.
+        """
+        prefix = "-" if exclude else ""
+        for field, value in filter.__dict__.items():
+            if not value:
+                continue
+            if field in REDIS_SEARCH_SCHEMA:
+                filter_str += prefix + self._typ_to_str(
+                    REDIS_SEARCH_SCHEMA[field], field, value
+                )
+            elif field in REDIS_SEARCH_SCHEMA["metadata"]:
+                if field == "source":  # handle the enum
+                    value = value.value
+                filter_str += prefix + self._typ_to_str(
+                    REDIS_SEARCH_SCHEMA["metadata"][field], field, value
+                )
+            elif field in ["start_date", "end_date"]:
+                filter_str += prefix + self._typ_to_str(
+                    REDIS_SEARCH_SCHEMA["metadata"]["created_at"], field, value
+                )
+        return filter_str
+
     def _get_redis_query(self, query: QueryWithEmbedding) -> RediSearchQuery:
         """
         Convert a QueryWithEmbedding into a RediSearchQuery.
@@ -222,46 +265,11 @@ class RedisDataStore(DataStore):
         """
         filter_str: str = ""
 
-        # RediSearch field type to query string
-        def _typ_to_str(typ, field, value) -> str:  # type: ignore
-            if isinstance(typ, TagField):
-                return f"@{typ.as_name}:{{{self._escape(value)}}} "
-            elif isinstance(typ, TextField):
-                return f"@{typ.as_name}:{self._escape(value)} "
-            elif isinstance(typ, NumericField):
-                num = to_unix_timestamp(value)
-                match field:
-                    case "start_date":
-                        return f"@{typ.as_name}:[{num} +inf] "
-                    case "end_date":
-                        return f"@{typ.as_name}:[-inf {num}] "
-
-        def _append_filters(filter_str, filter, exclude):
-            prefix = "-" if exclude else ""
-            for field, value in filter.__dict__.items():
-                if not value:
-                    continue
-                if field in REDIS_SEARCH_SCHEMA:
-                    filter_str += prefix + _typ_to_str(
-                        REDIS_SEARCH_SCHEMA[field], field, value
-                    )
-                elif field in REDIS_SEARCH_SCHEMA["metadata"]:
-                    if field == "source":  # handle the enum
-                        value = value.value
-                    filter_str += prefix + _typ_to_str(
-                        REDIS_SEARCH_SCHEMA["metadata"][field], field, value
-                    )
-                elif field in ["start_date", "end_date"]:
-                    filter_str += prefix + _typ_to_str(
-                        REDIS_SEARCH_SCHEMA["metadata"]["created_at"], field, value
-                    )
-            return filter_str
-
         # Build filter
         if query.filter_in:
-            filter_str = _append_filters(filter_str, query.filter_in, exclude=False)
+            filter_str = self._append_filters(filter_str, query.filter_in, exclude=False)
         if query.filter_out:
-            filter_str = _append_filters(filter_str, query.filter_out, exclude=True)
+            filter_str = self._append_filters(filter_str, query.filter_out, exclude=True)
 
         # Postprocess filter string
         filter_str = filter_str.strip()
@@ -287,6 +295,36 @@ class RedisDataStore(DataStore):
         """
         # Delete the keys
         await asyncio.gather(*[self.client.delete(key) for key in keys])
+
+    async def _find_keys_by_filter(self, filter: DocumentMetadataFilter) -> List[str]:
+        """
+        Find the Redis keys of all document chunks matching a metadata filter.
+
+        Args:
+            filter (DocumentMetadataFilter): Metadata filter.
+
+        Returns:
+            List[str]: Matching Redis keys.
+        """
+        filter_str = self._append_filters("", filter, exclude=False).strip()
+        if not filter_str:
+            return []
+        query_str = f"({filter_str})"
+
+        # First find the total number of matches, then fetch all of them
+        count_query = RediSearchQuery(query_str).paging(0, 0).no_content().dialect(2)
+        count_result = await self.client.ft(REDIS_INDEX_NAME).search(count_query)
+        if count_result.total == 0:
+            return []
+
+        full_query = (
+            RediSearchQuery(query_str)
+            .paging(0, count_result.total)
+            .no_content()
+            .dialect(2)
+        )
+        search_result = await self.client.ft(REDIS_INDEX_NAME).search(full_query)
+        return [doc.id for doc in search_result.docs]
 
     #######
 
@@ -391,17 +429,13 @@ class RedisDataStore(DataStore):
 
         # Delete by filter
         if filter:
-            # TODO - extend this to work with other metadata filters?
-            if filter.document_id:
-                try:
-                    keys = await self._find_keys(
-                        f"{REDIS_DOC_PREFIX}:{filter.document_id}:*"
-                    )
-                    await self._redis_delete(keys)
-                    logging.info(f"Deleted document {filter.document_id} successfully")
-                except Exception as e:
-                    logging.info(f"Error deleting document {filter.document_id}: {e}")
-                    raise e
+            try:
+                keys = await self._find_keys_by_filter(filter)
+                await self._redis_delete(keys)
+                logging.info(f"Deleted {len(keys)} documents matching filter successfully")
+            except Exception as e:
+                logging.info(f"Error deleting documents matching filter: {e}")
+                raise e
 
         # Delete by explicit ids (Redis keys)
         if ids:
